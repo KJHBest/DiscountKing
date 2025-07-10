@@ -266,8 +266,46 @@
             }
 
             .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                gap: 15px;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .product-card {
+                padding: 15px;
+            }
+
+            .product-image {
+                height: 120px;
+            }
+
+            .product-name {
+                font-size: 1em;
+                margin-bottom: 8px;
+            }
+
+            .promotion-badge {
+                font-size: 0.7em;
+                padding: 4px 8px;
+                margin-bottom: 8px;
+            }
+
+            .price-info {
+                flex-direction: column;
+                gap: 5px;
+                align-items: flex-start;
+            }
+
+            .original-price, .sale-price {
+                font-size: 0.9em;
+            }
+
+            .store-badge {
+                font-size: 0.7em;
+                padding: 2px 6px;
+            }
+
+            .date-info {
+                font-size: 0.7em;
             }
         }
     </style>
@@ -324,19 +362,13 @@
         </footer>
     </div>
 
-    <!-- Firebase SDK (수익화를 위해 나중에 활성화) -->
-    <!--
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-analytics.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
-    -->
-
     <script>
         // 전역 변수
         let products = [];
         let isLoading = true;
-/*
-        // Firebase 설정 (나중에 실제 키로 교체)
+        let isFirebaseInitialized = false;
+
+        // Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyCwJodY83c12cRzGAs4QXr4P7dmphHwRTU",
             authDomain: "fit-it-analytics.firebaseapp.com",
@@ -346,10 +378,7 @@
             appId: "1:403285719660:web:23105be5ae490067847649",
             measurementId: "G-9Z1M2D08YJ"
         };
-        firebase.initializeApp(firebaseConfig);
-        firebase.analytics();
-        
-*/
+
         // DOM 요소들
         const productsGrid = document.getElementById('productsGrid');
         const searchBox = document.getElementById('searchBox');
@@ -360,13 +389,42 @@
         const loading = document.getElementById('loading');
         const errorMessage = document.getElementById('errorMessage');
 
+        // Firebase 안전 초기화
+        async function initializeFirebase() {
+            try {
+                // Firebase SDK 동적 로딩
+                const firebaseApp = await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
+                const firebaseAnalytics = await loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js');
+                
+                if (typeof firebase !== 'undefined') {
+                    firebase.initializeApp(firebaseConfig);
+                    firebase.analytics();
+                    isFirebaseInitialized = true;
+                    console.log('Firebase 초기화 성공');
+                }
+            } catch (error) {
+                console.warn('Firebase 초기화 실패:', error);
+                console.warn('Firebase 없이 앱을 계속 실행합니다.');
+            }
+        }
+
+        // 스크립트 동적 로딩
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
         // JSON 데이터 로딩 함수
         async function loadProductData() {
             try {
                 showLoading(true);
                 
                 // products.json 파일에서 데이터 로드
-                // GitHub Pages에서는 같은 디렉토리의 파일을 fetch로 불러올 수 있습니다
                 const response = await fetch('./products.json');
                 
                 if (!response.ok) {
@@ -374,10 +432,6 @@
                 }
                 
                 const data = await response.json();
-                
-                // JSON 구조에 따라 데이터 추출
-                // 만약 products 배열이 루트에 있다면: products = data;
-                // 만약 products 키 안에 있다면: products = data.products;
                 products = data.products || data;
                 
                 console.log(`${products.length}개의 상품 데이터를 로드했습니다.`);
@@ -388,43 +442,94 @@
                 
             } catch (error) {
                 console.error('데이터 로딩 실패:', error);
-                showError(true);
                 showLoading(false);
                 
-                // 로컬 테스트를 위한 샘플 데이터 (JSON 파일 로딩 실패 시)
-                products = [
-                    {
-                        "id": "1",
-                        "name": "롯데)밀키스P500ml",
-                        "originalPrice": 2200,
-                        "salePrice": 1100,
-                        "promotion": "1+1",
-                        "category": "음료",
-                        "imageUrl": "https://tqklhszfkvzk6518638.edge.naverncp.com/product/8801056755010.jpg",
-                        "stores": ["CU"],
-                        "startDate": "2025-03-20",
-                        "endDate": "2025-04-20"
-                    },
-                    {
-                        "id": "2",
-                        "name": "코카)환타오렌지P600ml",
-                        "originalPrice": 2100,
-                        "salePrice": 1050,
-                        "promotion": "1+1",
-                        "category": "음료",
-                        "imageUrl": "https://tqklhszfkvzk6518638.edge.naverncp.com/product/8801094112707.png",
-                        "stores": ["CU"],
-                        "startDate": "2025-03-20",
-                        "endDate": "2025-04-20"
-                    }
-                ];
-                
-                setTimeout(() => {
-                    showError(false);
-                    initializeFilters();
-                    renderProducts(products);
-                }, 2000);
+                // 샘플 데이터로 테스트
+                await loadSampleData();
             }
+        }
+
+        // 샘플 데이터 로딩
+        async function loadSampleData() {
+            console.log('샘플 데이터로 테스트 중...');
+            
+            products = [
+                {
+                    "id": "1",
+                    "name": "롯데)밀키스P500ml",
+                    "originalPrice": 2200,
+                    "salePrice": 1100,
+                    "promotion": "1+1",
+                    "category": "음료",
+                    "imageUrl": "https://tqklhszfkvzk6518638.edge.naverncp.com/product/8801056755010.jpg",
+                    "stores": ["CU"],
+                    "startDate": "2025-03-20",
+                    "endDate": "2025-04-20"
+                },
+                {
+                    "id": "2",
+                    "name": "코카)환타오렌지P600ml",
+                    "originalPrice": 2100,
+                    "salePrice": 1050,
+                    "promotion": "1+1",
+                    "category": "음료",
+                    "imageUrl": "https://tqklhszfkvzk6518638.edge.naverncp.com/product/8801094112707.png",
+                    "stores": ["CU"],
+                    "startDate": "2025-03-20",
+                    "endDate": "2025-04-20"
+                },
+                {
+                    "id": "3",
+                    "name": "GS25 도시락",
+                    "originalPrice": 4500,
+                    "salePrice": 2250,
+                    "promotion": "1+1",
+                    "category": "식품",
+                    "imageUrl": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0i+u2E/uyd/u2x/u2YmeGgq1+wuSDsl4bsnYw8L3RleHQ+PC9zdmc+",
+                    "stores": ["GS25"],
+                    "startDate": "2025-03-20",
+                    "endDate": "2025-04-20"
+                },
+                {
+                    "id": "4",
+                    "name": "세븐일레븐 김밥",
+                    "originalPrice": 3000,
+                    "salePrice": 1500,
+                    "promotion": "1+1",
+                    "category": "식품",
+                    "imageUrl": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0i+uydtOuvuOyngCDsl4bsnYw8L3RleHQ+PC9zdmc+",
+                    "stores": ["세븐일레븐"],
+                    "startDate": "2025-03-20",
+                    "endDate": "2025-04-20"
+                },
+                {
+                    "id": "5",
+                    "name": "하겐다즈 아이스크림",
+                    "originalPrice": 8000,
+                    "salePrice": 4000,
+                    "promotion": "1+1",
+                    "category": "디저트",
+                    "imageUrl": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0i+uydtOuvuOyngCDsl4bsnYw8L3RleHQ+PC9zdmc+",
+                    "stores": ["CU", "GS25"],
+                    "startDate": "2025-03-20",
+                    "endDate": "2025-04-20"
+                },
+                {
+                    "id": "6",
+                    "name": "스니커즈 초콜릿",
+                    "originalPrice": 3000,
+                    "salePrice": 1000,
+                    "promotion": "2+1",
+                    "category": "과자",
+                    "imageUrl": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0i+uydtOuvuOyngCDsl4bsnYw8L3RleHQ+PC9zdmc+",
+                    "stores": ["세븐일레븐"],
+                    "startDate": "2025-03-20",
+                    "endDate": "2025-04-20"
+                }
+            ];
+            
+            initializeFilters();
+            renderProducts(products);
         }
 
         // 로딩 상태 표시
@@ -480,9 +585,9 @@
             const discount = Math.round((1 - product.salePrice / product.originalPrice) * 100);
             
             return `
-                <div class="product-card">
+                <div class="product-card" onclick="trackProductClick('${product.id}')">
                     <img src="${product.imageUrl}" alt="${product.name}" class="product-image" 
-                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuydtOuvuOyngCDsl4bsnYw8L3RleHQ+PC9zdmc+'">
+                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0i+uydtOuvuOyngCDsl4bsnYw8L3RleHQ+PC9zdmc+'">
                     <div class="promotion-badge">${product.promotion}</div>
                     <h3 class="product-name">${product.name}</h3>
                     <div class="price-info">
@@ -545,29 +650,49 @@
         storeFilter.addEventListener('change', filterProducts);
         promotionFilter.addEventListener('change', filterProducts);
 
-        // 초기화
-        document.addEventListener('DOMContentLoaded', () => {
-            // JSON 데이터 로드
-            loadProductData();
-            
-            // Google Analytics (나중에 활성화)
-            /*
-            gtag('config', 'G-XXXXXXXXXX');
-            */
-        });
-
-        // 페이지 로딩 추적 (Firebase Analytics 연동 시 사용)
+        // 페이지 로딩 추적
         function trackPageView() {
-            // firebase.analytics().logEvent('page_view');
+            if (isFirebaseInitialized && typeof firebase !== 'undefined') {
+                try {
+                    firebase.analytics().logEvent('page_view', {
+                        page_title: '편스토어 메인',
+                        page_location: window.location.href
+                    });
+                } catch (error) {
+                    console.warn('Analytics 로깅 실패:', error);
+                }
+            }
         }
 
-        // 상품 클릭 추적 (Firebase Analytics 연동 시 사용)
+        // 상품 클릭 추적
         function trackProductClick(productId) {
-            // firebase.analytics().logEvent('select_content', {
-            //     content_type: 'product',
-            //     content_id: productId
-            // });
+            if (isFirebaseInitialized && typeof firebase !== 'undefined') {
+                try {
+                    firebase.analytics().logEvent('select_content', {
+                        content_type: 'product',
+                        content_id: productId
+                    });
+                } catch (error) {
+                    console.warn('Analytics 로깅 실패:', error);
+                }
+            }
         }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('앱 초기화 시작...');
+            
+            // Firebase 초기화 (백그라운드에서)
+            initializeFirebase();
+            
+            // 데이터 로드
+            await loadProductData();
+            
+            // 페이지 뷰 추적
+            trackPageView();
+            
+            console.log('앱 초기화 완료!');
+        });
     </script>
 
     <!-- Google AdSense (수익화를 위해 나중에 활성화) -->
